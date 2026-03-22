@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+.venv/
+venv/
+*.pyc
+.DS_Store
+
+# Archives
+*.zip
+
+# Course handout / local reference (not application source)
+L1.2_CG_projects_2026.pdf
+VTK_code_and_tutorials/
+
+# Imaging data (large; keep locally — paths expected under Neuroimaging_visualization_project/)
+Neuroimaging_visualization_project/
