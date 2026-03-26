@@ -105,7 +105,7 @@ Module docstrings at the top of each `task*.py` file state the assignment requir
 
 ---
 
-# Task 3 - TODO
+# Task 3 - DSA visualization (Task3Widget)
 
 **File:** `src/task3_dsa_viz.py`
 
