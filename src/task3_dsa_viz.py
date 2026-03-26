@@ -554,11 +554,8 @@ class Task3Widget(QWidget):
         N = self._stack.shape[0]
         H, W = self._time_map.shape
 
-        # Flip vertically: NumPy row-0 is top, VTK row-0 is bottom
-        flipped = np.flipud(self._time_map).copy()
-
         # numpy_to_vtk_image (utils.py) wraps a 2-D array as vtkImageData
-        vtk_img = numpy_to_vtk_image(flipped)
+        vtk_img = numpy_to_vtk_image(self._time_map)
 
         # LUT: frame 0 → red, frame N-1 → blue
         self._lut = make_time_lut(N)
