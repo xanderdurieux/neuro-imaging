@@ -24,7 +24,7 @@ import os
 import vtk
 import numpy as np
 from vtkmodules.util import numpy_support as vtk_numpy
-from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGroupBox,

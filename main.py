@@ -22,8 +22,8 @@ from PyQt5.QtCore import Qt
 
 from src.task1_basic_viz import Task1Widget
 from src.task2_eeg_viz   import Task2Widget
-# from src.task3_dsa_viz   import Task3Widget
-# from src.task4_mip       import Task4Widget
+from src.task3_dsa_viz   import Task3Widget
+from src.task4_mip       import Task4Widget
 from src.utils           import check_data_files
 
 
@@ -40,13 +40,13 @@ class MainWindow(QMainWindow):
         # Instantiate task widgets (VTK is lazy-initialised on first show)
         self._task1 = Task1Widget()
         self._task2 = Task2Widget()
-        # self._task3 = Task3Widget()
-        # self._task4 = Task4Widget()
+        self._task3 = Task3Widget()
+        #self._task4 = Task4Widget()
 
         self.tabs.addTab(self._task1, "1 – Basic Visualization")
         self.tabs.addTab(self._task2, "2 – EEG Visualization")
-        # self.tabs.addTab(self._task3, "3 – DSA Visualization")
-        # self.tabs.addTab(self._task4, "4 – MIP Slicing")
+        self.tabs.addTab(self._task3, "3 – DSA Visualization")
+        #self.tabs.addTab(self._task4, "4 – MIP Slicing")
 
         # ── Status bar ────────────────────────────────────────────────────────
         status = QStatusBar()
