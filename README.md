@@ -122,11 +122,19 @@ Module docstrings at the top of each `task*.py` file state the assignment requir
 
 ---
 
-# Task 4 - TODO
+## Task 4 — MIP slicing (`Task4Widget`)
 
 **File:** `src/task4_mip.py`
 
-TODO
+**Data:** `vessels_data.vtk`.
+
+**Pipeline (high level):**
+
+- `vtkStructuredPointsReader` loads the volume and the scalar array is cached as a NumPy array of shape `(Z, Y, X)` for efficient slab extraction.
+- For each of the three orthogonal views (Axial / Sagittal / Coronal) a slab of slices is extracted with NumPy indexing and projected to a 2-D image via `np.max` along the slab axis (this is the Maximum Intensity Projection step).
+- The resulting 2-D array is wrapped as `vtkImageData` via `numpy_to_vtk_image` (utils.py) and passed through `vtkImageMapToWindowLevelColors` for brightness/contrast adjustment before display with `vtkImageActor`.
+- A global slab-thickness slider controls what percentage of the total slices in each direction forms the projection slab (default: 10 %).
+- Window and Level sliders adjust the grey-scale mapping across all three views simultaneously.
 
 ---
 

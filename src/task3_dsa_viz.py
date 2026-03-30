@@ -487,7 +487,7 @@ class Task3Widget(QWidget):
     def _recompute_map(self, _=None):
         """
         Compute self._time_map from self._stack using the selected method,
-        then refresh the VTK display. Called after loading and on method change.
+        then refresh the VTK display.
         """
         if self._stack is None:
             return
