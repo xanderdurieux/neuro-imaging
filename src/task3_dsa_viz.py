@@ -510,32 +510,16 @@ class Task3Widget(QWidget):
             # Only frames above the background threshold contribute as weights
             # so that low-noise pixels don't bias the result toward the middle
             # of the temporal range.
-            # The result is then linearly rescaled to [0, N-1] so it uses the
-            # full LUT spectrum rather than clustering near the midpoint.
+
             f_idx   = np.arange(N, dtype=np.float32)
             weights = np.where(self._stack > threshold, self._stack, 0.0)
             w_sum   = weights.sum(axis=0)
 
-            raw = np.where(
+            time_map = np.where(
                 w_sum > 0,
                 (weights * f_idx[:, None, None]).sum(axis=0) / w_sum,
                 0.0,
             ).astype(np.float32)
-
-            # Stretch to [0, N-1] so every colour in the LUT is visible
-            valid = raw[~self._bg_mask]
-            if valid.size > 0:
-                lo, hi = valid.min(), valid.max()
-                if hi > lo:
-                    time_map = np.where(
-                        ~self._bg_mask,
-                        (raw - lo) / (hi - lo) * (N - 1),
-                        0.0,
-                    ).astype(np.float32)
-                else:
-                    time_map = raw
-            else:
-                time_map = raw
 
         time_map[self._bg_mask] = 0.0
         self._time_map = time_map
@@ -557,8 +541,21 @@ class Task3Widget(QWidget):
         # numpy_to_vtk_image (utils.py) wraps a 2-D array as vtkImageData
         vtk_img = numpy_to_vtk_image(self._time_map)
 
-        # LUT: frame 0 → red, frame N-1 → blue
+        # Map the LUT range to the actual data range so the full colour spectrum
+        # is always used, regardless of which coloring method is active.
+        # For argmax the range is [0, N-1].
+        # For weighted average the values cluster in a subrange,
+        # so we stretch the LUT to [actual_min, actual_max] instead of [0, N-1].
+        valid_vals = self._time_map[~self._bg_mask]
+        if valid_vals.size > 0:
+            lut_min = float(valid_vals.min())
+            lut_max = float(valid_vals.max())
+        else:
+            lut_min, lut_max = 0.0, float(N - 1)
+
         self._lut = make_time_lut(N)
+        self._lut.SetRange(lut_min, lut_max)
+        self._lut.Build()
 
         # vtkImageMapToColors applies the LUT to every scalar value
         coloriser = vtk.vtkImageMapToColors()
@@ -596,7 +593,7 @@ class Task3Widget(QWidget):
         self, vtk_colored: vtk.vtkImageData, H: int, W: int
     ) -> None:
         """Zero-out background pixels in the coloured VTK image."""
-        if self._bg_mask is None:
+        if self._bg_mask is None: # bg_mask is True for background pixels
             return
         scalars = vtk_numpy.vtk_to_numpy(
             vtk_colored.GetPointData().GetScalars()
