@@ -12,7 +12,7 @@ volume, only a slab of N slices (default: 10 % of the total depth in each
 direction) is projected.
 
 Three orthogonal views are displayed simultaneously:
-    Axial    – projection along Z, slab scrolled in Z
+    Transverse    – projection along Z, slab scrolled in Z
     Sagittal – projection along X, slab scrolled in X
     Coronal  – projection along Y, slab scrolled in Y
 
@@ -38,7 +38,7 @@ from .utils import PATHS, make_renderer, numpy_to_vtk_image
 
 # Projection axis index for each named view
 AXES: dict[str, int] = {
-    "Axial (Z)":    2,
+    "Transverse (Z)":    2,
     "Sagital (X)":  0,
     "Coronal (Y)":  1,
 }
@@ -80,7 +80,7 @@ class Task4Widget(QWidget):
         root.addWidget(vtk_panel, stretch=3)
 
         positions = {
-            "Axial (Z)":    (0, 0),
+            "Transverse (Z)":    (0, 0),
             "Sagital (X)":  (0, 1),
             "Coronal (Y)":  (1, 0),
         }
@@ -257,7 +257,7 @@ class Task4Widget(QWidget):
         Extract a slab from self._vol and return its MIP as a 2-D array.
 
         Returns a 2-D float32 array whose shape matches the display plane:
-            Axial    → (Y, X)
+            Transverse    → (Y, X)
             Coronal  → (Z, X)
             Sagittal → (Z, Y)
         """
@@ -268,7 +268,7 @@ class Task4Widget(QWidget):
 
         end = min(start + slab_size, n_slices)   # exclusive upper bound
 
-        if axis_idx == 2:       # Axial: project along Z
+        if axis_idx == 2:       # Transverse: project along Z
             slab = self._vol[start:end, :, :]    # (slab, Y, X)
             return slab.max(axis=0)              # (Y, X)
         elif axis_idx == 1:     # Coronal: project along Y
@@ -356,7 +356,7 @@ class Task4Widget(QWidget):
         """
         Nx, Ny, Nz = dims
         n_slices_for = {
-            "Axial (Z)":    Nz,
+            "Transverse (Z)":    Nz,
             "Sagittal (X)":  Nx,
             "Coronal (Y)":  Ny,
         }
@@ -399,7 +399,7 @@ class Task4Widget(QWidget):
 
         Nz, Ny, Nx = self._vol.shape
         n_slices_for = {
-            "Axial (Z)":    Nz,
+            "Transverse (Z)":    Nz,
             "Sagital (X)":  Nx,
             "Coronal (Y)":  Ny,
         }
