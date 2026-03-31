@@ -39,7 +39,7 @@ from .utils import PATHS, make_renderer, numpy_to_vtk_image
 # Projection axis index for each named view
 AXES: dict[str, int] = {
     "Transverse (Z)":    2,
-    "Sagital (X)":  0,
+    "Sagittal (X)":  0,
     "Coronal (Y)":  1,
 }
 
@@ -81,7 +81,7 @@ class Task4Widget(QWidget):
 
         positions = {
             "Transverse (Z)":    (0, 0),
-            "Sagital (X)":  (0, 1),
+            "Sagittal (X)":  (0, 1),
             "Coronal (Y)":  (1, 0),
         }
         for name, (row, col) in positions.items():
@@ -400,7 +400,7 @@ class Task4Widget(QWidget):
         Nz, Ny, Nx = self._vol.shape
         n_slices_for = {
             "Transverse (Z)":    Nz,
-            "Sagital (X)":  Nx,
+            "Sagittal (X)":  Nx,
             "Coronal (Y)":  Ny,
         }
         for name, n_slices in n_slices_for.items():
