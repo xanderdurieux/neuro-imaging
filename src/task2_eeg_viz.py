@@ -28,7 +28,7 @@ from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGroupBox,
-    QPushButton, QLabel, QFileDialog, QSplitter, QSpinBox, QSlider,
+    QPushButton, QLabel, QFileDialog, QSplitter, QSpinBox,
 )
 from PyQt5.QtCore import Qt, QTimer
 
@@ -55,6 +55,10 @@ CHART_COLORS = [
     "#e6194b", "#3cb44b", "#4363d8", "#f58231",
     "#911eb4", "#42d4f4", "#f032e6", "#bfef45",
 ]
+
+# Fixed smoothing setup for Task 2 brain mesh (non-configurable).
+BRAIN_SMOOTH_ITERATIONS = 150
+BRAIN_SMOOTH_PASSBAND   = 0.0003
 
 
 class Task2Widget(QWidget):
@@ -100,31 +104,6 @@ class Task2Widget(QWidget):
         btn_load = QPushButton("Load head_with_lesion.vtk")
         btn_load.clicked.connect(self._load_file)
         rl.addWidget(btn_load)
-
-        # Mesh smoothing
-        smooth_box = QGroupBox("Brain Mesh Smoothing")
-        sl_layout  = QVBoxLayout(smooth_box)
-
-        # Slider maps [1, 100] → pass-band [0.10, 0.001] (inverse: lower = smoother)
-        smooth_row = QHBoxLayout()
-        smooth_row.addWidget(QLabel("Less"))
-        self.slider_smooth = QSlider(Qt.Horizontal)
-        self.slider_smooth.setRange(1, 100)
-        self.slider_smooth.setValue(85)   # default: aggressive smoothing
-        self.slider_smooth.valueChanged.connect(self._update_smooth_label)
-        smooth_row.addWidget(self.slider_smooth)
-        smooth_row.addWidget(QLabel("More"))
-        sl_layout.addLayout(smooth_row)
-
-        self.lbl_smooth = QLabel()
-        self._update_smooth_label(85)
-        sl_layout.addWidget(self.lbl_smooth)
-
-        btn_apply_smooth = QPushButton("Apply Smoothing")
-        btn_apply_smooth.clicked.connect(self._rebuild_brain_mesh)
-        sl_layout.addWidget(btn_apply_smooth)
-
-        rl.addWidget(smooth_box)
 
         # Electrodes
         elec_box = QGroupBox("Electrodes")
@@ -329,29 +308,13 @@ class Task2Widget(QWidget):
 
     # ── Smoothing helpers ─────────────────────────────────────────────────────
 
-    def _slider_to_passband(self, slider_val: int) -> float:
-        """
-        Map slider [1, 100] → pass-band [0.10, 0.0001].
-        Higher slider value = more smoothing = lower pass-band.
-        Log scale so each step feels perceptually uniform.
-        """
-        import math
-        lo, hi = math.log(0.10), math.log(0.0001)
-        t = (slider_val - 1) / 99.0
-        return math.exp(lo + t * (hi - lo))
-
-    def _update_smooth_label(self, slider_val: int):
-        pb = self._slider_to_passband(slider_val)
-        self.lbl_smooth.setText(f"Pass-band: {pb:.4f}  (lower = smoother)")
-
     def _run_brain_smooth(self) -> vtk.vtkPolyData:
-        """Run vtkWindowedSincPolyDataFilter with the current slider setting."""
-        pb = self._slider_to_passband(self.slider_smooth.value())
+        """Run vtkWindowedSincPolyDataFilter with fixed smoothing parameters."""
 
         sinc = vtk.vtkWindowedSincPolyDataFilter()
         sinc.SetInputConnection(self._brain_contour.GetOutputPort())
-        sinc.SetNumberOfIterations(150)
-        sinc.SetPassBand(pb)
+        sinc.SetNumberOfIterations(BRAIN_SMOOTH_ITERATIONS)
+        sinc.SetPassBand(BRAIN_SMOOTH_PASSBAND)
         sinc.BoundarySmoothingOn()
         sinc.NonManifoldSmoothingOn()
         sinc.NormalizeCoordinatesOn()
@@ -363,25 +326,6 @@ class Task2Widget(QWidget):
         normals.Update()
 
         return normals.GetOutput()
-
-    def _rebuild_brain_mesh(self):
-        """Re-smooth the brain contour with the current slider and refresh the view."""
-        if self._brain_contour is None or not hasattr(self, "_renderer"):
-            return
-
-        self._update_smooth_label(self.slider_smooth.value())
-
-        smooth_poly = self._run_brain_smooth()
-        self._brain_poly.DeepCopy(smooth_poly)
-        self._init_mesh_scalars()
-        self._build_locator()
-
-        # Clear electrodes — positions are invalid on the new geometry
-        self._clear_electrodes()
-
-        self._brain_mapper.Update()
-        self._renderer.ResetCamera()
-        self.vtk_widget.GetRenderWindow().Render()
 
     # ── Scalar initialisation ─────────────────────────────────────────────────
 

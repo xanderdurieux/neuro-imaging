@@ -41,12 +41,12 @@ from .utils import PATHS, make_renderer, add_axes, build_isosurface
 # Actual labels in head_with_lesion.vtk (uint8 COLOR_SCALARS):
 #   0 = background, 42 = skin, 84 = skull, 127 = grey matter,
 #   169 = brain (white matter), 254 = lesion
-# Marching-cubes iso at the midpoint between consecutive labels.
+# Assignment requires four rendered structures (skin, grey matter, brain, lesion),
+# so skull is intentionally not exposed as a separate mesh.
 ISO_PRESETS = {
     #  name          iso     RGB colour            opacity
     # Skin: white + very transparent (inner structures visible through it)
     "skin":        ( 21,  (1.00, 1.00, 1.00), 0.20),   # boundary  0 ↔ 42
-    "skull":       ( 63,  (0.90, 0.85, 0.65), 0.35),   # boundary 42 ↔ 84
     "grey_matter": (105,  (0.70, 0.70, 0.95), 0.70),   # boundary 84 ↔ 127
     "brain":       (148,  (0.85, 0.72, 0.60), 1.00),   # boundary 127 ↔ 169
     "lesion":      (211,  (1.00, 0.10, 0.10), 1.00),   # boundary 169 ↔ 254
@@ -55,10 +55,9 @@ ISO_PRESETS = {
 # Keyboard keys that toggle each mesh
 MESH_KEYS = {
     "1": "skin",
-    "2": "skull",
-    "3": "grey_matter",
-    "4": "brain",
-    "5": "lesion",
+    "2": "grey_matter",
+    "3": "brain",
+    "4": "lesion",
 }
 
 
@@ -138,10 +137,9 @@ class Task1Widget(QWidget):
         self.mesh_buttons: dict[str, QPushButton] = {}
         mesh_labels = {
             "skin":        "Skin  [key 1]",
-            "skull":       "Skull  [key 2]",
-            "grey_matter": "Grey Matter  [key 3]",
-            "brain":       "Brain  [key 4]",
-            "lesion":      "Lesion  [key 5]",
+            "grey_matter": "Grey Matter  [key 2]",
+            "brain":       "Brain  [key 3]",
+            "lesion":      "Lesion  [key 4]",
         }
         for key, label in mesh_labels.items():
             btn = QPushButton(label)
@@ -151,6 +149,12 @@ class Task1Widget(QWidget):
             mesh_layout.addWidget(btn)
             self.mesh_buttons[key] = btn
 
+        # Opacity mode selector
+        self.chk_transparent = QCheckBox("Transparent meshes")
+        self.chk_transparent.setChecked(True)  # default: current assignment/report values
+        self.chk_transparent.stateChanged.connect(lambda _: self._update_mesh_opacity_mode())
+        mesh_layout.addWidget(self.chk_transparent)
+        
         # Smoothing mode selector
         mesh_layout.addWidget(QLabel("Smoothing method:"))
         self.chk_smooth_image = QCheckBox("Smooth image before meshing\n(Gaussian, σ=1.0)")
@@ -175,7 +179,7 @@ class Task1Widget(QWidget):
             "Keyboard shortcuts (VTK focus):\n"
             "  s / t / c  toggle planes\n"
             "  +  /  -    scroll active plane\n"
-            "  1-5  toggle meshes\n"
+            "  1-4  toggle meshes\n"
             "  r  reset camera"
         )
         self.info_label.setWordWrap(True)
@@ -333,6 +337,7 @@ class Task1Widget(QWidget):
                 port, iso, color, opacity,
                 smooth_iterations=30 if use_smooth_mesh else 0,
             )
+            actor.GetProperty().SetOpacity(self._target_opacity(name))
             actor.SetVisibility(False)
             self._renderer.AddActor(actor)
             self._mesh_actors[name] = actor
@@ -348,6 +353,20 @@ class Task1Widget(QWidget):
                 lambda on, a=actor: (a.SetVisibility(int(on)),
                                      self.vtk_widget.GetRenderWindow().Render())
             )
+
+    def _target_opacity(self, mesh_name: str) -> float:
+        """Return opacity for the given mesh under the selected mode."""
+        if self.chk_transparent.isChecked():
+            return ISO_PRESETS[mesh_name][2]  # keep current per-mesh transparency
+        return 1.0
+
+    def _update_mesh_opacity_mode(self):
+        """Apply current opacity mode to all existing mesh actors."""
+        if not self._mesh_actors:
+            return
+        for name, actor in self._mesh_actors.items():
+            actor.GetProperty().SetOpacity(self._target_opacity(name))
+        self.vtk_widget.GetRenderWindow().Render()
 
     def _rebuild_meshes(self):
         """Remove existing mesh actors and rebuild with the current smoothing settings."""
