@@ -134,7 +134,7 @@ def make_time_lut(n_frames: int) -> vtk.vtkLookupTable:
     lut = vtk.vtkLookupTable()
     lut.SetHueRange(0.0, 0.667)   # red → blue
     lut.SetRange(0, n_frames - 1)
-    lut.SetNumberOfColors(n_frames)
+    lut.SetNumberOfColors(256)
     lut.Build()
     return lut
 

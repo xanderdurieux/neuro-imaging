@@ -107,17 +107,16 @@ Module docstrings at the top of each `task*.py` file state the assignment requir
 
 ## Task 3 — DSA visualization (`Task3Widget`)
 
-**File:** `src/task3_dsa_viz.py`
+**File:** `src/task3_dsa_viz_threshold.py`
 
-**Data:** PNG sequences from `DSA of AVM examples/` (each subfolder contains one temporal series of images).
+**Data:** PNG sequences from `DSA of AVM examples/` (each subfolder contains two temporal series of images).
 
 **Pipeline:**
 
-- `vtkPNGReader` loads each frame of the DSA sequence. The pipeline automatically detects the dominant frame size and discards inconsistent frames (e.g., in Embo datasets) to ensure a valid NumPy stack (N, H, W).
-- Frames are converted to grayscale and background pixels are masked using a global intensity threshold.
+- `vtkPNGReader` loads each frame of the DSA sequence. The pipeline automatically detects the dominant frame size and discards inconsistent frames (e.g., in Embo datasets) to ensure a valid NumPy stack (N, H, W). It also splits the series into distinct "views" by detecting intensity jumps (removing anomalous/reference frames).
+- Contrast is isolated by calculating the absolute difference between each pixel and the median intensity of the stack.
 - A time map is computed per pixel using **argmax** or **intensity-weighted average** to encode contrast arrival.
-- The map is converted to `vtkImageData` and color-mapped (Red-to-Blue) using `vtkImageMapToColors` and a custom `vtkLookupTable`.
-- The result is displayed with `vtkImageActor`, with a `vtkScalarBarActor` showing the temporal scale.
+- The map is smoothed with a Gaussian filter, color-mapped (Red-to-Blue) via `vtkImageMapToColors`, and rendered using `vtkImageActor`. Pixels without signal are masked to dark gray.
 - `vtkCellPicker` captures pixel coordinates. Left-clicking opens a separate dialog with a Matplotlib plot showing the contrast flow curve (mean intensity over a configurable neighborhood).
 
 ---

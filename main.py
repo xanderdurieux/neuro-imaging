@@ -22,7 +22,7 @@ from PyQt5.QtCore import Qt
 
 from src.task1_basic_viz import Task1Widget
 from src.task2_eeg_viz   import Task2Widget
-from src.task3_dsa_viz   import Task3Widget
+from src.task3_dsa_viz_threshold   import Task3Widget
 from src.task4_mip       import Task4Widget
 from src.utils           import check_data_files
 
