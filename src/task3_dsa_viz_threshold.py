@@ -146,7 +146,7 @@ class Task3Widget(QWidget):
         # The view currently selected by the user (index into _views)
         self._current_view_idx: int = 0
 
-        # The stack of the current view — this is what _recompute_map works on
+        # The stack of the current view (this is what _recompute_map works on)
         self._stack:       np.ndarray | None = None  # (N, H, W) float32
 
         # The 2-D time map produced by _recompute_map (H, W) float32
@@ -628,26 +628,36 @@ class Task3Widget(QWidget):
         # The median is an estimator of the background intensity
         median_val = np.median(self._stack)
         stack_adj = np.abs(self._stack - median_val) # (N, H, W)
+
         # Now the background is close to 0, and pixels that differ from it have larger values.
+        strength = stack_adj.max(axis=0)
+
+        threshold = 0.15 * strength.max()
+        mask = strength > threshold
 
         if mid == 0:
             # Frame with maximum intensity
-            time_map = np.argmax(stack_adj, axis=0).astype(np.float32)
+            raw_map = np.argmax(stack_adj, axis=0).astype(np.float32)
         else:
             # Intensity-weighted average of frame indices: Σ f·w_f / Σ w_f
             f_idx = np.arange(N, dtype=np.float32)
             w_sum = stack_adj.sum(axis=0) # (H, W) sum of weights for each pixel
-            time_map = np.where(
+            raw_map = np.where(
                 w_sum > 0,
                 (stack_adj * f_idx[:, None, None]).sum(axis=0) / w_sum,
                 0.0
             ).astype(np.float32) # (H, W) weighted average of frame indices, or 0 if all weights are zero
 
+        time_map = np.where(mask, raw_map, -1.0)
         self._time_map = time_map
         self._push_dsa_to_vtk()
 
     def _push_dsa_to_vtk(self) -> None:
-        """Render self._time_map as a colour image with the red -> blue LUT."""
+        """
+        Convert self._time_map to a VTK image and display it with the time LUT.
+        Pixels with no signal (time < 0) are masked out and shown as dark gray.
+        """
+        
         if self._time_map is None:
             return
         if not self._renderer:
@@ -655,29 +665,57 @@ class Task3Widget(QWidget):
 
         N = self._stack.shape[0]
 
-        vtk_img = numpy_to_vtk_image(self._time_map)
+        display_map = self._time_map.copy()
+        no_signal = display_map < 0 # Mask for pixels with no signal (time < 0)
+        display_map[no_signal] = 0.0 # Set no-signal pixels to 0 for the Gaussian blur and color mapping steps
 
-        # Continuous red -> blue LUT with 256 steps
+        vtk_img = numpy_to_vtk_image(display_map)
+        
+        gauss = vtk.vtkImageGaussianSmooth() # Apply a mild Gaussian blur to make the colour transitions smoother
+        gauss.SetInputData(vtk_img) # The input is the raw time map (with no-signal pixels set to 0)
+        gauss.SetStandardDeviations(0.7, 0.7, 0.0) # Sigma controls the amount of blur
+        gauss.SetRadiusFactors(1.5, 1.5, 0.0) # Radius controls the extent of the blur
+        gauss.Update()
+
+        vtk_img = gauss.GetOutput()
+
         self._lut = make_time_lut(N)
         self._lut.SetRange(0, N - 1)
         self._lut.Build()
 
-        # Map the time values through the LUT so VTK renders them as RGB
         coloriser = vtk.vtkImageMapToColors()
         coloriser.SetInputData(vtk_img)
         coloriser.SetLookupTable(self._lut)
         coloriser.SetOutputFormatToRGB()
         coloriser.Update()
 
+        # Extract the RGB array from the coloriser output, reshape it to (H, W, 3), and set no-signal pixels to dark gray
+        rgb = vtk_numpy.vtk_to_numpy(
+            coloriser.GetOutput().GetPointData().GetScalars()
+        ).reshape(self._time_map.shape[0], self._time_map.shape[1], 3).copy()
+
+        
+
+        rgb[no_signal] = [13, 13, 13]
+
+        flat = rgb.reshape(-1, 3)
+        vtk_arr = vtk_numpy.numpy_to_vtk(flat, deep=True)
+        vtk_arr.SetNumberOfComponents(3)
+
+        masked_img = vtk.vtkImageData()
+        masked_img.SetDimensions(
+            self._time_map.shape[1], self._time_map.shape[0], 1
+        )
+        masked_img.GetPointData().SetScalars(vtk_arr)
+
         self._renderer.RemoveAllViewProps()
 
-        # Display the colourised time map as an RGB image
+        # Create an image actor for the masked RGB image and add it to the renderer
         self._image_actor = vtk.vtkImageActor()
         self._image_actor.PickableOn()
-        self._image_actor.GetMapper().SetInputData(coloriser.GetOutput())
+        self._image_actor.GetMapper().SetInputData(masked_img)
         self._renderer.AddActor(self._image_actor)
 
-        # Add a scalar bar to show the mapping from frame index to colour
         sbar = vtk.vtkScalarBarActor()
         sbar.SetLookupTable(self._lut)
         sbar.SetTitle("Frame")
@@ -698,7 +736,8 @@ class Task3Widget(QWidget):
 
     def _on_left_click(self, _obj, _event) -> None:
         """Left-click picks a pixel and plots its contrast flow curve.
-        Only active when the DSA map is displayed."""
+        Only active when the DSA map is displayed.
+        """
         x_scr, y_scr = self._iren.GetEventPosition()
 
         if self._showing_dsa and self._stack is not None and self._image_actor is not None:
@@ -709,11 +748,21 @@ class Task3Widget(QWidget):
                 N, H, W = self._stack.shape
 
                 px     = int(np.clip(int(round(world[0])), 0, W - 1))
-                py_vtk = int(np.clip(int(round(world[1])), 0, H - 1))
-                py_np  = H - 1 - py_vtk
+                py_np = int(np.clip(int(round(world[1])), 0, H - 1))
 
                 if 0 <= px < W and 0 <= py_np < H:
-                    self._lbl_picked.setText(f"Picked: ({px}, {py_np})")
+                    picked_time = self._time_map[py_np, px]
+
+                    if picked_time < 0:
+                        self._lbl_picked.setText(
+                            f"Picked: ({px}, {py_np})  no signal"
+                        )
+                        return
+
+                    self._lbl_picked.setText(
+                        f"Picked: ({px}, {py_np})  time={picked_time:.2f}"
+                    )
+
                     self._show_flow_curve(px, py_np)
 
         self._style.OnLeftButtonDown()
@@ -723,20 +772,30 @@ class Task3Widget(QWidget):
         N, H, W = self._stack.shape
         r = self._slider_radius.value()
 
-        y0 = max(0, cy - r);  y1 = min(H - 1, cy + r)
-        x0 = max(0, cx - r);  x1 = min(W - 1, cx + r)
+        y0 = max(0, cy - r)
+        y1 = min(H - 1, cy + r)
+        x0 = max(0, cx - r)
+        x1 = min(W - 1, cx + r)
 
-        patch = self._stack[:, y0:y1 + 1, x0:x1 + 1]
+        # Use the same contrast signal used for the DSA map
+        median_val = np.median(self._stack)
+        stack_adj = np.abs(self._stack - median_val)
+
+        patch = stack_adj[:, y0:y1 + 1, x0:x1 + 1]
         if patch.size == 0:
             return
 
         curve = patch.mean(axis=(1, 2))
+
         color = CHART_COLORS[self._next_curve_color % len(CHART_COLORS)]
         self._next_curve_color += 1
 
         self._selected_curves.append({
-            "curve": curve, "cx": cx, "cy": cy,
-            "radius": r, "color": color,
+            "curve": curve,
+            "cx": cx,
+            "cy": cy,
+            "radius": r,
+            "color": color,
         })
 
         if self._curve_dialog is None:

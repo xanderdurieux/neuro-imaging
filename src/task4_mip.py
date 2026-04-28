@@ -166,8 +166,6 @@ class Task4Widget(QWidget):
         cl.addStretch()
         cl.addWidget(QLabel(
             "Three simultaneous MIP views.\n"
-            "Each view projects a slab of slices\n"
-            "along its own axis.\n\n"
             "Use the position sliders to scroll\n"
             "the slab through the volume."
         ))
@@ -298,8 +296,7 @@ class Task4Widget(QWidget):
 
         mip = self._compute_mip(name, mid_start)   # 2-D (H, W) float32
 
-        # Wrap the MIP array as vtkImageData using the shared utility.
-        # numpy_to_vtk_image expects shape (H, W) or (H, W, C).
+        # Wrap the MIP array as vtkImageData using the shared utility
         vtk_img = numpy_to_vtk_image(mip)
         self._vtk_images[name] = vtk_img
 
